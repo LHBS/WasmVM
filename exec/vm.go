@@ -57,11 +57,12 @@ type VM struct {
 
 	module  *wasm.Module
 	globals []uint64
-	memory  []byte
+	Memmanage
 	funcs   []function
 
 	funcTable [256]func()
 
+	Limit uint64
 	// RecoverPanic controls whether the `ExecCode` method
 	// recovers from a panic and returns it as an error
 	// instead.
@@ -86,15 +87,41 @@ func NewVM(module *wasm.Module) (*VM, error) {
 		if len(module.Memory.Entries) > 1 {
 			return nil, ErrMultipleLinearMemories
 		}
+		vm.Memmanage.blocks = make(map[int]*Block)
+		vm.Memmanage.allocatedBytes = -1
 		vm.memory = make([]byte, uint(module.Memory.Entries[0].Limits.Initial)*wasmPageSize)
 		copy(vm.memory, module.LinearMemoryIndexSpace[0])
+	}
+
+	if module.Data != nil {
+		var allocated int
+		var length int
+		for _, entry := range module.Data.Entries {
+			val, err := module.ExecInitExpr(entry.Offset)
+			if err != nil{
+				return nil,err
+			}
+			offset, ok := val.(int32)
+			if !ok {
+				return nil, errors.New("invalid data index")
+			}
+			vm.Memmanage.blocks[int(offset)] = &Block{ptype: DString, size: len(entry.Data)}
+			length = int(offset) + len(entry.Data)
+			if length > allocated {
+				allocated = length
+			}
+		}
+		vm.Memmanage.allocatedBytes= allocated
+	} else {
+		vm.Memmanage.allocatedBytes = -1
 	}
 
 	vm.funcs = make([]function, len(module.FunctionIndexSpace))
 	vm.globals = make([]uint64, len(module.GlobalIndexSpace))
 	vm.newFuncTable()
 	vm.module = module
-
+	vm.Limit = 10000
+        vm.RecoverPanic = true
 	nNatives := 0
 	for i, fn := range module.FunctionIndexSpace {
 		// Skip native methods as they need not be
@@ -163,6 +190,11 @@ func NewVM(module *wasm.Module) (*VM, error) {
 // Memory returns the linear memory space for the VM.
 func (vm *VM) Memory() []byte {
 	return vm.memory
+}
+
+// Memory returns the linear memory space for the VM.
+func (vm *VM) Mmanager() *Memmanage {
+	return &vm.Memmanage
 }
 
 func (vm *VM) pushBool(v bool) {
@@ -326,6 +358,11 @@ outer:
 	for int(vm.ctx.pc) < len(vm.ctx.code) && !vm.abort {
 		op := vm.ctx.code[vm.ctx.pc]
 		vm.ctx.pc++
+		vm.Limit--
+		if vm.Limit == 0 {
+			panic("cpu limit!")
+		}
+
 		switch op {
 		case ops.Return:
 			break outer
@@ -407,53 +444,66 @@ type Process struct {
 	vm *VM
 }
 
+func (proc *Process) VMmalloc(size int, ptype DataType)(int, error) {
+	manage := proc.vm.Mmanager()
+	return manage.Malloc(size, ptype)
+}
+
+func (proc *Process) VMSetBlock(val interface{}) (int, error) {
+	manage := proc.vm.Mmanager()
+	return manage.SetBlock(val)
+}
+
+func (proc *Process) VMGetSize(addr int) (int, error) {
+	manage := proc.vm.Mmanager()
+	return manage.GetBlockSize(addr)
+}
+
+func (proc *Process) VMGetData(addr int) ([]byte, error) {
+	manage := proc.vm.Mmanager()
+	return manage.GetBlockData(addr)
+}
+
+func (proc *Process) VMSetData(addr int, val []byte) (int, error) {
+	manage := proc.vm.Mmanager()
+	length, err := manage.SetBlockData(addr, val)
+	return length,err
+}
+
 // NewProcess creates a VM interface object for host functions
 func NewProcess(vm *VM) *Process {
 	return &Process{vm: vm}
 }
 
+func (proc *Process) LoadAt(off int)(out []byte) {
+	mem := proc.vm.Memory()
+	data := mem[off:]
+	return data
+}
+
 // ReadAt implements the ReaderAt interface: it copies into p
 // the content of memory at offset off.
-func (proc *Process) ReadAt(p []byte, off int64) (int, error) {
+func (proc *Process) ReadAt(p []byte, off int, length int) (error) {
 	mem := proc.vm.Memory()
-
-	var length int
-	if len(mem) < len(p)+int(off) {
-		length = len(mem) - int(off)
-	} else {
-		length = len(p)
+	if len(mem) < length +off {
+		err := errors.New("too long")
+		return err
 	}
-
-	copy(p, mem[off:off+int64(length)])
-
-	var err error
-	if length < len(p) {
-		err = io.ErrShortBuffer
-	}
-
-	return length, err
+	copy(p, mem[off:off+length])
+	return  nil
 }
 
 // WriteAt implements the WriterAt interface: it writes the content of p
 // into the VM memory at offset off.
-func (proc *Process) WriteAt(p []byte, off int64) (int, error) {
+func (proc *Process) WriteAt(p []byte, off int, length int) (error) {
 	mem := proc.vm.Memory()
-
-	var length int
-	if len(mem) < len(p)+int(off) {
-		length = len(mem) - int(off)
-	} else {
-		length = len(p)
+	if len(mem) < length +off {
+		err := errors.New("too long")
+		return err
 	}
 
 	copy(mem[off:], p[:length])
-
-	var err error
-	if length < len(p) {
-		err = io.ErrShortWrite
-	}
-
-	return length, err
+	return nil
 }
 
 // Terminate stops the execution of the current module.

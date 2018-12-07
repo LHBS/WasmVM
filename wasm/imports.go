@@ -123,16 +123,31 @@ func (module *Module) resolveImports(resolve ResolveFunc) error {
 	}
 
 	modules := make(map[string]*Module)
-
+	native  := GetFuns()
 	var funcs uint32
 	for _, importEntry := range module.Import.Entries {
-		importedModule, ok := modules[importEntry.ModuleName]
-		if !ok {
-			var err error
-			importedModule, err = resolve(importEntry.ModuleName)
-			if err != nil {
-				return err
-			}
+		//TODO
+		if importEntry.ModuleName == "env" {
+			switch importEntry.Type.Kind() {
+				case ExternalFunction:
+				funcType := module.Types.Entries[importEntry.Type.(FuncImport).Type]
+				host := native.GetValue(importEntry.FieldName)
+				fn := &Function{Sig: &FunctionSig{ParamTypes: funcType.ParamTypes, ReturnTypes: funcType.ReturnTypes}, Body: &FunctionBody{}, Host:host}
+				module.FunctionIndexSpace = append(module.FunctionIndexSpace, *fn)
+				module.Code.Bodies = append(module.Code.Bodies, *fn.Body)
+				module.imports.Funcs = append(module.imports.Funcs, funcs)
+				funcs++
+				}
+
+
+		}else{
+			importedModule, ok := modules[importEntry.ModuleName]
+			if !ok {
+				var err error
+				importedModule, err = resolve(importEntry.ModuleName)
+				if err != nil {
+					return err
+				}
 
 			modules[importEntry.ModuleName] = importedModule
 		}
