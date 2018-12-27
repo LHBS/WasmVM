@@ -1,28 +1,41 @@
-wagon
-=====
+## wagon
+wagon是go语言实现的WebAssembly解释器，可作为区块链虚拟机使用。<br>
 
-[![Build Status](https://travis-ci.org/go-interpreter/wagon.svg?branch=master)](https://travis-ci.org/go-interpreter/wagon)
-[![codecov](https://codecov.io/gh/go-interpreter/wagon/branch/master/graph/badge.svg)](https://codecov.io/gh/go-interpreter/wagon)
-[![GoDoc](https://godoc.org/github.com/go-interpreter/wagon?status.svg)](https://godoc.org/github.com/go-interpreter/wagon)
+## 用法
+示例：
+```
+#include <string.h>
+#include <stdio.h>
+#include <module.h>
+#include <print.h>
+#include <runtime.h>
 
-`wagon` is a [WebAssembly](http://webassembly.org)-based interpreter in [Go](https://golang.org), for [Go](https://golang.org).
+typedef struct{
+    int num;
+    char *name;
+}averger;
 
-**NOTE:** `wagon` requires `Go >= 1.9.x`.
+int init(int num, char *name){
+    averger m;
+    m.num = num;
+    m.name = name;
+    printi(m.num);
+    prints(m.name);
+    return 0;
+}
 
-## Purpose
-
-`wagon` aims to provide tools (executables+libraries) to:
-
-- decode `wasm` binary files
-- load and execute `wasm` modules' bytecode.
-
-`wagon` doesn't concern itself with the production of the `wasm` binary files;
-these files should be produced with another tool (such as [wabt](https://github.com/WebAssembly/wabt) or [binaryen](https://github.com/WebAssembly/binaryen).)
-`wagon` *may* provide a utility to produce `wasm` files from `wast` or `wat` files (and vice versa.)
-
-The primary goal of `wagon` is to provide the building blocks to be able to build an interpreter for Go code, that could be embedded in Jupyter or any Go program.
-
-
-## Contributing
-
-See the [CONTRIBUTING](https://github.com/go-interpreter/license/blob/master/CONTRIBUTE.md) guide for pointers on how to contribute to `go-interpreter` and `wagon`.
+export int apply(char *method){
+    if(strcmp(method, "init") == 0){
+        int num = read_param(1);
+        char *name = read_param(2);
+        init(num, name);
+    }
+    return 0;
+}
+```
+源码在cmd/wasm/testdata/test.c，使用[C语言编译器](https://github.com/LHBS/C2Webassembly)编译源码生成wasm文件。<br>
+在cmd/wasm目录下执行：<br>
+`go build -o vm main.go ` <br>
+`./vm`
+## 添加API
+cmd/wasm/wasmservice/service.go中RegisterApi提供了注册API的方法。
