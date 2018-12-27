@@ -9,12 +9,12 @@ func main() {
 	data, _ := ioutil.ReadFile("testdata/test.wasm")
 
 	paras := make([]wasmservice.Param,2)
-	paras[0] = wasmservice.Param{Ptype:"int32",Pval:"007"}
-	paras[1] = wasmservice.Param{Ptype:"string",Pval:"IronMan"}
+	paras[0] = wasmservice.Param{Type:"int32",Val:"007"}
+	paras[1] = wasmservice.Param{Type:"string",Val:"IronMan"}
 
 	args := wasmservice.Params{
-		Arg:  paras,
-		Addrs: make([]int64,2),
+		Data:  paras,
+		Addr:  make([]int64,2),
 	}
 
 	ws := wasmservice.WasmService{

@@ -12,13 +12,13 @@ import (
 )
 
 type Params struct{
-	Arg     []Param
-	Addrs   []int64
+	Data    []Param
+	Addr    []int64
 }
 
 type Param struct {
-	Ptype string `json:"type"`
-	Pval  string `json:"value"`
+	Type string
+	Val  string
 }
 
 type WasmService struct {
@@ -28,44 +28,40 @@ type WasmService struct {
 }
 
 func (ws *WasmService) ParseParam(vm *exec.VM)([]uint64, error){
-
 	method, err := vm.Memmanage.SetBlock(ws.Method)
 	if err != nil{
 		return nil,err
 	}
-	param := make([]uint64,1)
-	param[0] = uint64(method)
-	var(
-		addr     int
-		v_string string
-		v_int64  int64
-		v_uint64 uint64
-	)
-	pcount := len(ws.Args.Arg)
-	for index := 0;index < pcount; index++{
-		switch ws.Args.Arg[index].Ptype{
+	params := make([]uint64,1)
+	params[0] = uint64(method)
+
+	pCount := len(ws.Args.Data)
+	for index := 0; index < pCount; index++ {
+		switch ws.Args.Data[index].Type {
 		case "string":
-			v_string = ws.Args.Arg[index].Pval
-			addr, err = vm.Memmanage.SetBlock(v_string)
+			vString := ws.Args.Data[index].Val
+			addr, err := vm.Memmanage.SetBlock(vString)
 			if err != nil{
-				return nil, errors.New("para error")
+				return nil, errors.New("store string error")
 			}
-			ws.Args.Addrs[index] = int64(addr)
+			ws.Args.Addr[index] = int64(addr)
+
 		case "int8","int16","int32","int64":
-			v_string = ws.Args.Arg[index].Pval
-			v_int64, _ = strconv.ParseInt(v_string, 10, 64)
-			ws.Args.Addrs[index] = v_int64
+			vString := ws.Args.Data[index].Val
+			vInt64, _ := strconv.ParseInt(vString, 10, 64)
+			ws.Args.Addr[index] = vInt64
+
 		case "uint8","uint16","uint32":
-			v_string = ws.Args.Arg[index].Pval
-			v_uint64, _ = strconv.ParseUint(v_string, 10, 64)
-			ws.Args.Addrs[index] = int64(v_uint64)
+			vString := ws.Args.Data[index].Val
+			vUint64, _ := strconv.ParseUint(vString, 10, 64)
+			ws.Args.Addr[index] = int64(vUint64)
+
 		default:
-			return nil, errors.New("unsupport type")
+			return nil, errors.New("unSupport type")
 
 		}
-
 	}
-	return param,nil
+	return params,nil
 }
 
 func (ws *WasmService) Execute() ([]byte, error) {
