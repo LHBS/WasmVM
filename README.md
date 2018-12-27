@@ -33,9 +33,13 @@ export int apply(char *method){
     return 0;
 }
 ```
-源码在cmd/wasm/testdata/test.c，使用[C语言编译器](https://github.com/LHBS/C2Webassembly)编译源码生成wasm文件。<br>
-在cmd/wasm目录下执行：<br>
+test.c文件在cmd/wasm/testdata文件夹下，使用[C语言编译器](https://github.com/LHBS/C2Webassembly)编译源码生成wasm文件，
+### 运行
 `go build -o vm main.go ` <br>
 `./vm`
+
 ## 添加API
-cmd/wasm/wasmservice/service.go中RegisterApi提供了注册API的方法。
+cmd/wasm/wasmservice/service.go中RegisterApi提供了注册API的方法，实现C语言访问虚拟机资源的接口。
+
+
+
